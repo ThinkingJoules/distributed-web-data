@@ -23,6 +23,7 @@ The user of this system should never have to acquire any tokens*. In theory, if 
 I feel there are a few core aspects to build this system.
 1) The low level stuff. This is the blockchain(s), and core semantic symbols. [Read more here](https://github.com/ThinkingJoules/distributed-web-data/blob/main/identifiers.md)
 2) The mid level stuff. This is building up semantic symbols in some sort of extensible and easier-than-RDF system to make the SOD. [Read more here](https://github.com/ThinkingJoules/distributed-web-data/blob/main/semantic-objects.md)
-3) The high level stuff. This is building tooling to aid in build UI's in a low-code manner.
+3) [Using 1 and 2 together](https://github.com/ThinkingJoules/distributed-web-data/blob/main/all-at-once.md)
+4) Queries (need to figure out #2 first so we know what the 'triple' looks like)
+5) UI Builders/components. Since Apps should now be UI's, how can we make building UI's easier/simpler.
 
-1 and 2 are very much intertwined and need to be worked on with the other in mind. I feel 3 is not needed until 1&2 are more firmed up.
