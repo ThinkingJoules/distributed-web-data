@@ -62,53 +62,83 @@ So instead of a taxonomy, I think we should use the idea of a suffix again, like
 So I posit, that RDF wasn't way off with it's suffix in the value, I just think we need to think about how to describe stuff and where to put it.
 
 ## What is a Property, What is a Datatype?
-So lets define some terms here. I would like re-use the property and datatype vocabulary, but I would like to define how I think about them.
+So lets define some terms here. Let us re-use the property and datatype vocabulary, but I would like to define how I think about them, at least at this point in the document.
 ### Property
 So as you can tell from my example about height, I feel that a property is akin to a literal dictionary definition. So for height we get "the measurement from base to top or (of a standing person) from head to foot." Obviously there are other defintions below this, that I didn't mean, like "the most intense part or period of something." That is more of a problem of symbol mapping and is why you shouldn't include more than one definition when defining a property in this system. If we had some sort of shortname, these would collide and you would need disambiguation in the UI so the user was using the right "height", since it's true identifier is a [chain coordinate](https://github.com/ThinkingJoules/distributed-web-data/issues/2). So a property is a definition. This makes sense, and also why adding the units as directly part of it, is not quite right.
 ### Datatype
-To me, either everything is a data type, or nearly nothing is. I prefer nearly nothing. I believe RDF puts units as part of it's suffix as 'datatype'. I think, in RDF you would need to create a specific datatype for all combinations of integers/floats and potential units. Basically you can't compose the combination, you need to define it. I tend to think of these as the technical reason for a suffix.
+To me, either everything is a data type, or nearly nothing is. I believe RDF puts everything as part of it's suffix as 'datatype'. Basically you get one tag to define any encodings (since it is all text), underlying types (integer, boolean, etc), and the unit (centimeters, inches, etc).
 
-So I think of datatypes as primitive data: Boolean, Numbers (ints/floats), UTF-8. Numbers are a fun one. Do we think about the concept of numbers or the memory layout of them? So Rust would have u8,u16 etc. But really they are just [Natural Integers](https://en.wikipedia.org/wiki/Natural_number) with a maximum value constraint added? Or are they actually Integers with a min and max value constraint? Generally in computer science we don't think about the abstract types, but usually in Signed/Unsigned Integers, or Floats. Trying to represent numbers in binary is really hard, and ultimately all of this will be on computers. So I think we should opt for the computer types. Especially because floating point numbers are well understood and using abstract concepts aren't **really** what we are representing. I think that signed and unsigned integers could be simply variable length encoding, but I could see people wanting to use fixed size encoding as well. When we get into defining schema, constraints will need to be allowed.
+So ***I*** think of datatypes as primitive data: Boolean, Numbers (ints/floats), UTF-8. Numbers are a fun one. Do we think about the concept of numbers or the memory layout of them? So Rust would have u8,u16 etc. But really they are just [Natural Numbers](https://en.wikipedia.org/wiki/Natural_number) with a maximum value constraint added? Or are they actually Integers with a min and max value constraint? Generally in computer science we don't think about the abstract types, but usually in Signed/Unsigned Integers, or Floats. Trying to represent numbers in binary is really hard, and ultimately all of this will be on computers. *So I think we should opt for the computer types*. Especially because floating point numbers are well understood and using abstract concepts aren't **really** what we are representing. I think that signed and unsigned integers could simply be variable length encoding, but I could see people wanting to use fixed size encoding as well. When we get into defining schema, constraints will need to be allowed.
+
+More on datatypes later.
 ### Units
-I think we need to add a new word to our vocab so we can properly describe things. Units are really no different than properties, in that they are purely semantic concepts we made up. We just need to understand and convey the meaning of the symbol so it can be (re)used properly.
+I think we need to add a new word to our vocab so we can properly describe things. UNITs are really no different than properties, in that they are purely semantic concepts humans made up (more preciesly, they carry a learned *intuition* of scale). We just need to understand and convey the meaning of the (UNIT's) symbol so it can be (re)used properly.
 (The obvious next step when adding units, is adding conversions or translations. This is a deep subject and something we can build to, but lets put that in the back of our mind for now.)
-I think that the units would really only be able to constrain the datatype to that of a 'string' or a 'number'. We could get around this if we split languages out from other units. Something to explore, given the language translations probably won't fit in to any sort of addressable function that could be called within this system. Would need to translate by running it through a trained language model of some sorts. Where as most of the unit *conversions* could be straightforward math.
 
-## Typedef
+## PropDef
 So how would we define a property? Well for backwards compatibility I think we need to make 'units' optional. If we can build a conversion system, everyone will want to add/require them since the system will automagically deal with stuff in the background for us. Depending on how conversions work, I could see properties defining a list of valid combinations. What would we need to fully define this? Lets work on the height example from before
 
-```js
-shortName = "height"
-description = "the measurement from base to top or (of a standing person) from head to foot."
-units = [
-  {
-    unit: "{symbol for centimeters}",
-    representations: [{symbol for u-var-int},{symbol for u8}],
-    constraints:{max:305}
-  },
-  {
-    unit: "{symbol for inches}",
-    representations: [{symbol for u-var-int},{symbol for u8}],
-    constraints:{max:120}
-  }
-]
+```json
+{
+ "shortName": "height",
+ "description": "the measurement from base to top or (of a standing person) from head to foot.",
+ "datatype": 
+ [
+   {
+    "unit": "{symbol for centimeters}",
+    "representations": ["{symbol for u-var-int}", "{symbol for u8}"],
+    "constraints": {"max":305}
+   },
+   {
+    "unit": "{symbol for inches}",
+    "representations": ["{symbol for u-var-int}", "{symbol for u8}"],
+    "constraints": {"max":120}
+   }
+ ]
+}
 ```
-This is just a rough idea. I think allowing different representations is fine, as long as we can encode the '{symbol for (repr)}' at the front of all binary encodings. Ultimately, there aren't going to be too many representations so I would think all clients should be able to figure out any of them. Representations (datatypes) might be easiest if we build them in to the implementation, since these are so low level the clients will need to implement them. We could also ensure the absolute smallest symbol tag. The downside, is that the datatypes are no longer directly addressable. Something to think about.
+This is just a rough idea. I think allowing different representations is fine, as long as we can encode the '{symbol for (repr)}' at the front of all binary encodings. Ultimately, there aren't going to be too many representations so I would think all clients should be able to figure out any of them. Representations (datatypes) might be easiest if we build them in to the implementation, since these are so low level the clients will need to implement them. We could also ensure the absolute smallest symbol tag. The downside, is that the datatypes are no longer directly addressable. Something to think about, depends on how we develop these ideas.
 
-I don't know how to handle different base units, however, if we can sort of make auto-conversion happen then properties just have to put things in proper precision for their usecase, and the UI can convert to feet+inches or decimal feet or whatever makes sense for a particular usecase and context. At the low level, we just want to make sure it is well understood so conversions can be easy and automatic. Time is a solid example of bases not being nice. I would assume things would get stored in some sort of epoch based origin (Unix for example). If you didn't need much precision you could store it in Hours or Days to save data footprint, and then convert to the correct unit if you needed to add, say 10 minutes to it or something. Time is always hard and always will be.
+I don't know how to handle different base units, however, if we can sort of make auto-conversion happen then properties just have to put things in proper precision for their usecase, and the UI can convert to feet+inches or decimal feet or whatever makes sense for a particular usecase and context. At the low level, we just want to make sure it is well understood so conversions can be easy and automatic. Time is a solid example of something common and the bases are not nice to work with. I would assume things would get stored in some sort of epoch based origin (Unix for example). If you didn't need much precision you could store it in Hours or Days to save data footprint, and then convert to the correct unit if you needed to add, say 10 minutes to it or something. Time is always hard and always will be.
 
 This is why auto conversion will be tricky, but not impossible. We have already solved all of these problems many many times. So if we solve it one more time, then developers within this data paradigm should be able to work in more abstract things such as units, and pay less attention to the how.
 
-Another advantage to all of this, is that if UI's (apps) built by different people, want to work in a different unit, given that context, they can. For example if app 'A' want to display a time duration in decimal seconds and app 'B' in milliseconds, regardless of what is 'on disk' either can display there preferred and also save back data in there preffered without needing to think about it, or have it 'mess up' the other apps logic.
+Another advantage to all of this, is that if UI's (apps) built by different people, want to work in a different unit, given that context, they can. For example if app 'A' want to display a time duration in decimal seconds and app 'B' in milliseconds, regardless of what is 'on disk' either can display there preferred units and also save back data in there preffered units without needing to think about it, or have it 'mess up' the other apps logic.
+
+## Suffix Cases
+So lets look at a human level, how we are already familiar with using suffixes.
+* Lanuguage - We don't usually think about this one, but at world-scale, it is clear.
+  * These would be "LANG_TAG"
+* Units - As mentioned above, most numbers will have a suffix to give it a human intuitive scale (Time, Length, Currency, etc).
+  * These would be "UNIT" 
+* Filetypes - Operating systems use these as hints to know what program understands the syntax/grammar of the bits in the file.
+  * These would be "FILE_EXT"
+We can see our earlier suffix distinctions coming through. FILE_EXT is basically a language tag for computers. VS Code relies heavily on file suffixes to properly enable the right extension that can 'read' the file and run background linting, code completion, etc. So FILE_EXT and LANG_TAG are really similar conceptually. But what if we, say, have a markdown file written in english? Can we have *both* tags at once? Ultimately if a computer could understand how to differentiate the markdown syntax from the human syntax, I suppose it could translate a ```.md.en -> .md.it``` file. Many computer files deal with human text. So this seems like it needs to be allowed so future applications are able to build auto-translators. Most browsers already have this. It is basically ```.html.en -> .html.it ```. I'm not sure if browsers detect the language or by 'detect' it looks for a language tag in the html document. I have been on foreign (to me) language sites that the browser never prompted me, so I suspect it still needs hints. However this could change in the future as ML models get better.
+### Nested Syntax
+I don't think we want to allow more than the two different language extensions. For example if we had an array of .pdf's and we have an 'Array' FILE_EXT, then we could do .array.pdf.en? I mean, perhaps I picked the wrong example, since Array *sounds* useful (I don't think we want it at this high of a level)... But if we want to restrict things, then we would have to make a new extension like .arrayPDF and then we would probably not require a LANG_TAG, and instead add the LANG_TAG as part of the encoding, since PDF's can be of different languages. Arrays in Javascript can be whatever, but in Rust, a Vec must be a single Type. I think it is best to simply make people build their own container file extensions.
+
+Let us try a different example. What if we wanted to do a tuple of some sort? Maybe like for RBG lights. .u8.u8.u8 This would be convienent, but wouldn't provide any information, besides the property symbol itself to query with.
+
+### Queries
+If we go with the only-two-extension route, then when paired with a semantic property, we can do data handling much easier. For example. If we had a property that meant 'height' (as defined from example earlier). Then we could query the data for all subjects that have this property (and probably other properties to ensure we have humans and not buildings) and then simply output the heights in whatever unit we wanted to work in (if the automagic conversions were working). These hints allow hooks for control flow to be composed with minimal code. The hooks can also be used for high, mid, or low order quering. High order would be selecting subjects that have X property(s). Mid order could be further selecting based on suffixes (heights in 'centimeters'). Low order would become tricky, given that auto conversions would need to work. So you could say 'Things with Length > 12"' and still return proper results for things that have units recorded in something other than inches.
+
+### Datatypes vs filetypes
+Let us look at datatypes for a second. Are these also file types? What is the difference between a novel in a .txt vs inlined in the value as a 'string'(datatype)?
+Later in this document you will see that at a technical level I *think* we have to treat everything as binary and chunk things to allow 'streaming' of any file/data-type. However, at this level we don't have to treat them the same. I *think* you could make a distinction without any trouble. So, should we?
+
+Is .u8 or .u-var-int or .utf-8 okay? Well the .utf-8 feels like a subset of .txt or something. I'm not sure where the [line ending difference](https://en.wikipedia.org/wiki/Newline#Issues_with_different_newline_formats) lies. Anyway, if two things are semantically understood as different for humans but logically the same from a technical perspective, I would prefer to uphold the conventions in the UI and keep the logic ... logical. There is really only one reason (that I can think of) to tag data/file-types, and that is to build control flow in applications to deal with it properly. For a UI, it could be the difference to display a .jpeg in an ```html<img>``` tag versus say a .u8 might have ```html<input type="number" min="0" max="255">``` (or min, max from the "constraints" in the PropDef).
+
+The biggest thing I can see that I don't like, is that it would be nice to have some sort of hierarchy or taxonomy of filetypes. However, if we look at this from a developer/symbol perspective, everything is just symbols. If everyone knows the 'core' file extensions, then they will work *as* datatypes. If we split datatypes out, then this is a new primitive in the System, even though the tooling has to be built around it regardless of how/where the symbol was created.
+
+So lets go with datatypes=filetypes and see how that plays. 
+
+Everything is a binary blob, with a FILE_EXT and an optional LANG_TAG (ideally this would be required based on the FILE_EXT, for continuity accross all data that has that extention. So something like a markdown (.md) would **always** need a LANG_TAG).
+
+Let us think of the implications for filetype conversions (*NOT UNIT CONVERSIONS*). So in programming, most commonly with numbers, we can ['cast' between types](https://en.wikipedia.org/wiki/Type_conversion). So can we extend this to files? We convert many types of things to many other types. .jpeg<->.png, .mp4<->.mov, u8<->u16, Numbers<->Strings. Some conversions are lossless and some are lossy. This would be something to be aware of when doing conversions. *UNITS* suffer from the same problem. Moving from one UNIT or TYPE with higher precision to a lower precision type can cause a loss of information. This is even true when converting integer centimeters to decimal meters. Float representation is *often* lossy (if you are working at that level of precision, you probably already know this, and build around it). The information world is a complicated place.
+
+So I see similarities between UNIT and FILE_EXT. Both are convertable things. The complexity and lossyness of the conversion varies widely. .u8->.f64 is pretty trivial. .u8.cm -> .f64.meters is a bit harder. A .docx.en -> .pdf.it is very hard. HOWEVER, if the subroutines were written, you could convert from TypeA -> TypeB.
+
+So a TYPE is really a binary blob plus a FILE_EXT with a (conditional LANG_TAG) || (UNIT). (Note: The Unit is probably written in a language, so should need its own LANG_TAG, however, since we are using it as a symbol, the language conversion of the description (which WOULD have a LANG_TAG) would simply need to be translated to the target language in the UI.)
 
 
---- WIP ---
-# Low Level Primitives
-I could imagine one of the early chains would define specifications for low level primitives that could be used and referenced in other projects (blockchain or not). The txn fee would probably be a crazy high amount of work. Something like days to weeks (maybe even a month?) of PoW to avoid unnecessary or useless primitives to be added (of course, someone still needs to implement it in software in some sort of client somewhere). If you could use the txn coordinates instead of hash, you could use this as a prefix on all the binary encodings so all data would be identifiable regardless of context. With sufficient work requirement you could easily end up with only a 2-3 byte prefix for all identifier tags. The goal is that this would become something like a permissionless and directly referenceable version of [multiformats](https://github.com/multiformats/multiformats) which is used in IPFS Content Identifiers. Not sure if all of 'multiformats' would be on a single chain or multiple. My default is more, simple chains. So looks like 3 chains according to their repo. [Addr](https://github.com/multiformats/multiaddr/blob/master/protocols.csv), [Base](https://github.com/multiformats/multibase/blob/master/multibase.csv), [Codec](https://github.com/multiformats/multicodec/blob/master/table.csv). 
-
-Things I would consider for a 4th chain; Primitives: boolean, utf-8 blob, binary blob, var-int(u/i), fixed length integers (u8,u16...,i8,i16,...), floats of various flavors. Primitives would rarely be expanded, but I could see the early types going up to like u256, so if some app needed a u512, they could still add it. I think all IPFS CIDs are utf-8 that represent binary, and their 'Base' list is how to figure out how to get the right bits out of the string. My preference for the system is everything is binary by default. UI's can make things textual for us humans.
-
-This could allow a new permissionless version of CIDs for use later in our non-DHT synching protocol.
-
-# Extending Primitives
-If you are making data machine readable, should you make it machine operatable? If we added another chain for [OPCODES](https://ethereum.org/en/developers/docs/evm/opcodes) we are well on our way to creating a universal (within this system) way to add functions to some sort of new machine semantic programming language. This seems extreme, but that is what is great by having this multi-chain system. We can just create the primitive chain first so we can have numbers and stuff, and then build on top of it later. That is the beauty of linked/semantic data. An interesting extension of this would be adding a suffix to primitives and can build conversion tables. Converting inches to feet or anything else the system has defined could be semantically understood and auto converted.
+# The Triple 2.0
