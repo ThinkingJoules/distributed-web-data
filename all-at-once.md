@@ -82,7 +82,7 @@ Repudiable data is the data as we mostly know it currently on the internet. [The
 I think repudiable data is pretty straightforward. I would propose using a [CRDT](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type) like GunDB to do data merges and allow offline editing. This data is what will be mostly used as the 'value' in the triple. Anything that is private by default would be here. Getting the two different data types to work together might be tricky, but there is no way (that I can see) how to get non-repudiation easily AND selectively. They are simply different paradigms. The best we can do, is make sure that the non-repudiable data can ***fit*** in to the rest of the triple pattern so it *looks* like repudiable data and can then integrate into the larger indexing and querying systems that will be built around that.
 
 # Data Authorship
-So verifying an author in non-repudiable data is pretty easy, since you have a signature at each state transition. However for doing repudiable data we have two options. Sign every state on every change, or sign a root of a merkle tree containing all the data. 
+So verifying an author in non-repudiable data is pretty easy, since you have a signature at each state transition. However for doing repudiable data we have two options. Sign every state on every change, or sign a root of a merkle tree containing all the data. (Note: I would pick a merklized PATRICIA Trie since these build in an idempotent and deterministic manner).
 ## Sign all the things
 This one is straight forward and easy to reason about. Any keys that are part of you LLI can sign at any time and publish the data widely (and wildly) and the CRDT will deal with it at ANY point in the network. Pros: Very flexible at the network level. Cons: LOTS of signatures for the entire system to validate (CPU). This is the approach GunDB takes. Everything is signed on your private graph and the network validates all signatures. The data itself is self-proving (With the LLI scheme, you would still need to see if the particular key they signed with is currently valid, so it is really self-prov**able**). We can speed up signature verifications using Schnorr Signatures [batch verification](https://bitcoin.stackexchange.com/questions/80698/schnorrs-batch-validation) property.
 ## Sign Once, share proofs
@@ -115,33 +115,125 @@ One reason to hash the data of the value, is to provide de-duplication. This new
 * Small values 'inlined' to prevent excess disk usage (and increase query performance)
 * Large values hashed, and ideally chunked (to allow partial fetching. ie: streaming a video).
 
-If we also go the single signature PATRICIA trie route, we need to include whatever bytes are at the 'value' in our proof. (A PATRICIA node is basically a hash of (Subject + Property + Value)). So if we have large values they will increase our proof size. If we are optimizing for proof size, then we want to inline anything less than our hash length and hash anything longer than our hash length.
+If we also go the single signature PATRICIA trie route, we need to include whatever bytes are at the 'value' in our proof. So if we have large values they will increase our proof size. If we are optimizing for proof size, then we want to inline anything less than our hash length and hash anything longer than our hash length.
+
+So what is all part of the our 'Value'?
+* Metadata
+  * CRDT Metadata
+  * Last Edited By
+  * Last Edit Time (if similar algo to GunDB, a unix TS is part of CRDT metadata)
+* Binary Blob
+* [Suffix(es)](https://github.com/ThinkingJoules/distributed-web-data/blob/main/semantic-objects.md#suffix-cases)
+  * FILE_EXT
+  * LANG_TAG
+  * UNITS
+
+Do we want our low level system to know about some or all of the metadata? Is the CRDT optional? There are many CRDT algos, what if different data or usecases wanted different merge characteristics? I think we would need to pick a single CRDT algo. If a network had many different algos then negotiating and dealing with all the different types of metadata would be difficult. I'm not familiar enough with CRDT's to know how much overlap their might be, but I would imagine gaining different properties through different algos will require categorically different metadata.
+
+## Provability
+Regardless of authentication method, as some point we are going to sign some bits. These bits may or may not be a hash, the point is what do we include in the 'Provably Authored' bits? Another way of stating this; what parts of the 'Value' are malleable without invalidating the signature?
+### CRDT Metadata
+This does not matter if it is changed, because ultimately we are only using this to arrive at some state that we are ***then*** going to sign. 
+### Last Edited Time
+We generally regard metadata as non-authoritative but we also use it extensively, else why would we have it? We will talk more about time below.
+### Last Edited By
+If we did a trie data structure in a company setting, I don't think you need this as part of the signature. If we were to include it, then we should include their signature for the updated state, so this is truly authenticated author. This would basically be a mix of 'Sign all the things' *within* the domain namespace trie of some 'company' LLI. This only makes sense in that context. Basically the more widely shared, trust decays, and this usecase can become more relevant. I think to allow all potential use cases it should be permitted, but not required. The obvious opt out, is you wouldn't want to sign all of your own changes within you own LLI namespace. So once we add the ability to opt out, it can be used however. Adding it will significantly increase proof size. This requires that the merkle proof itself be correct && any signatures *within* the proof to be valid in order to trust the 'Last Edited By' data. So you end up with double verification, some of which (signatures) is very expensive computationally.
+### FILE_EXT
+Re-interpreting the bits will almost always lead to a different 'understanding' (often corrupt or nonsense result) of the intended value. FILE_EXT should remain as part of the official 'value'. 
+### LANG_TAG
+This feels a little different. Since the base encoding can't be interpreted wrong by the computer the text will still be correct. I was once a website that I was reading in English, but the browser prompted me to translate it to English. I simply ignored the prompt since I can judge for my self. I think LANG_TAG *could* be ignored. It really is metadata hints more than a 'binding' declaration.
+### UNIT
+I think this is very much a human corollary of 're-interpreting the bits' for FILE_EXT, it is just in textual (usually) base 10 form. So this would need to be included as well.
+
+## Privacy and Provability
+To prove things in a merklized manner, you must supply enough data to reconstruct the path back to the root. In a regular merkle tree these would simply be a series of hashes. However, in a merklized PATRICA ***trie***, we must supply all the plaintext data for nodes on the path to the root. So anything that is required to be part of the 'bits' needs to be given. This means if we have the following:
+```
+key1 = "LLI"
+value1 = "Secret Data"
+
+key2 = "LLI/Subject1"
+value2 = "More Secrets"
+
+key3 = "LLI/Subject1/height"
+value3 = "6"
+
+```
+In order to prove the Subject1/height is indeed 6, you would need to supply "More Secrets" and "Secret Data" in the proof. Obviously our namespace LLI and the subject without a property aren't really 'triples'. Only key3/value3 logically contain our triple (Subject1, height, 6). As long as we don't store data on things less than a 'triple' key, we are fine. This is the tradeoff for gaining idempotency and determinism. So we need to be aware of prefixes in our trie.
+
+## Repudiable Time Log
+So what if we wanted to easily create a log? If we already have the idea of prefix trie, then simply extend the key:
+```
+LLI/Subject/Property/Timestamp = value at timestamp
+```
+We basically move the timestamp out of the metadata and into the key. This is now a 'Quad' key. This breaks our 'everything is a triple' but makes it really simple to reconstruct past states. Just need to ask for all keys in the subtree starting with ```LLI/Subject/Property/```. This is really simple given a prefix trie. If we don't want to include quad keys are part of our signature, we would simply pretend the triple key has no children and hash accordingly. That way this log can stay in the same structure but not be considered 'official' as part of the signature. However, trying to ignore them in queries is trickier, especially on a subtree search.
+
+### Triple, Quad, ...
+Let us just make up some stuff and see what it looks like.
+
+So an LLI would be ```dr:3.1.2``` this is indicating the subchain created in block 3 of the registration chain, and on that chain(the identity chain for this example) we are referencing the identity created in block 1, 2nd transaction within this block.
+
+A subject is curious, as ultimately the properties should define it, not its symbol. So if you were online and all your devices sent subject creations to the 'primary' server, in theory, you could simply increment an integer. If you are editing offline, then a local identifier could be created in the app, and then when back online, could send a 'create' message to have your central server designate a subject. If you want to do this completly offline and have it always work, then simply use some sort of UUID or another high entropy scheme. So with a subject we would have ```dr:3.1.2-subject1```
+
+Property is going to be chain coordinates (let us assume block=txn) ```dr:3.1.2-subject1:2.75```. This is our 'triple' key
+
+If we added a timestamp ```dr:3.1.2-subject1:2.75@1652212408``` This is our quad key for repudiable logs.
+
+
+Can we nest things by putting another subject as our subject? ```dr:3.7.1-dr:3.1.2-subject1:2.44@1652212408``` This would be more in RDF mode where user 3.7.1 is saying something about dr:3.1.2-subject1 and describing what they are saying as property=2.44? I think to allow this sort of encoding, we would need to make our own version of something like a CID from IPFS. The downside is that our URL's are now much more opaque (numbers really aren't great, so it isn't much of a loss).
+
+I have no idea the right way here. Just throwing out some ideas. 
+
+If we think of the triple as a sort of graph, where the Subject and Value are nodes and the Property is an edge connecting them, then could we add properties to edges with:
+ 
+ ```
+ dr:3.1.2-subject1:2.75:2.37
+ ```
+It looks a little funky, but it makes sense? This data wouldn't really fit RDF, and it wouldn't really fit a full labeled-property graph (the edges are undirected). You could always assume the edge is directed from subject to value, and if that value is another Subject then it makes sense. So maybe this would be similar to something like [Neo4j](https://neo4j.com/docs/getting-started/current/graphdb-concepts/)? 
+
+Circling back to the privacy issue; if we did properties on edges, then the value the edge is pointing to would be exposed during proofs. We could fix this by doing something like (let us call this the expanded form):
+
+ ```
+ dr:3.1.2-subject1:2.75/data = binaryBlob
+ dr:3.1.2-subject1:2.75/crdt = crdtMetadataBlob
+ dr:3.1.2-subject1:2.75/lastEditedTime = unixTS
+ dr:3.1.2-subject1:2.75/lastEditedBy = 3.1.2
+ dr:3.1.2-subject1:2.75/FILE_EXT = 5.55
+ dr:3.1.2-subject1:2.75/LANG_TAG = 6.1
+ dr:3.1.2-subject1:2.75/UNIT = 7.68
+ 
+ dr:3.1.2-subject1:2.75:2.37/data = binaryBlob
+ dr:3.1.2-subject1:2.75:2.37/crdt = crdtMetadataBlob
+ dr:3.1.2-subject1:2.75:2.37/lastEditedTime = unixTS
+ dr:3.1.2-subject1:2.75:2.37/lastEditedBy = 3.1.2
+ dr:3.1.2-subject1:2.75:2.37/FILE_EXT = 5.32
+ dr:3.1.2-subject1:2.75:2.37/LANG_TAG = 6.1
+ dr:3.1.2-subject1:2.75:2.37/UNIT = 7.22
+ ```
+We could then prove anything we wanted independently without exposing values with a common prefix. So it can work, it is just a matter if we would want to start thinking in prefixes instead of triples.
+
+Lots on uncertainty at this point the document. These are some really big factors and I personally don't have enough experience to confidently assert 'the right way' to move forward. The timestamp seems like a really straight-forward case, as it would be difficult to get the same effect as easily. Adding properties on edges gets kind of weird, but I can imagine when it could be really useful. It would make performing queries and indexing a little more complicated. 
+
+# Inline vs Hashed
+If we are working on our expanded form above all the ValueProperties are going to be small except the binaryBlob. This is where we would want to have the option to have it inline or a hash. If we use [Blake3](https://github.com/BLAKE3-team/BLAKE3) as a hasing algo, we can verify 1024bytes chunks using [Verified Streaming](https://github.com/oconnor663/bao/blob/master/docs/spec.md).
+
+To generalize value, someone might ask for ```dr:3.1.2-subject1:2.75/data/0``` for the first chunk or ```dr:3.1.2-subject1:2.75/data/?start=65&end=2543&noProof=true``` request chunks that include bytes 65..=2543 of the file. If noProof = false or not included, it would send the proper data to verify the chunks with the root hash which is present at ```dr:3.1.2-subject1:2.75/data```. We could potentially use the patricia structure itself, in which case there wouldn't be a hash at ```dr:3.1.2-subject1:2.75/data```. The downside to this approach is that the content hash is no longer portable, since it now implicit and dependent on our PATRICIA trie node encoding spec.
 
 
 --- WIP ---
-
-
-
-
-
-
 # Looking at Multiformats and CID
-IPFS uses the aforementioned 'multiformats' to build their [Content Identifiers or CIDs](https://github.com/multiformats/cid). Is this new system going to have a CID or something similar? I think perhaps, but only for the identifiers for the 'values' of our triples. So I think ours would be quite different in content, but similar in concept. Given our [construction](https://github.com/ThinkingJoules/distributed-web-data/blob/main/semantic-objects.md#the-triple-20) of the 'value' we need to encode things such as FILE_EXT, UNIT, and LANG_TAG. So what about the hash? If we have a boolean 'true' value, do we hash that as well and add the tags? This seems bad to explode 1 bit of data to ~34 bytes (32 byte has + ~2 bytes for the FILE_EXT tag). Let us explore a different representation, where we move the concept of CID up to the concept of our 'value'.
+IPFS uses the aforementioned 'multiformats' to build their [Content Identifiers or CIDs](https://github.com/multiformats/cid). Is this new system going to have a CID or something similar? I think perhaps. 
+
+Let us explore a different representation, where we move the concept of CID up to the concept of our 'value'.
 
 
-Do we need all of these, and/or how would this new system incorporate or get the effects of them? IPFS uses a single table in an attempt to save a byte for context namespace. I think it is best to break ours out to separate 'tables'(chains) and simply be slightly more inefficient, but the tradeoff is permissionless extensions and directly addressable/dereferencable definitions.
+
+IPFS uses a single table in an attempt to save a byte for context namespace. I think it is best to break ours out to separate 'tables'(chains) and simply be slightly more inefficient, but the tradeoff is permissionless extensions and directly addressable/dereferencable definitions.
 
 ### Multiformat - Address
 [These](https://github.com/multiformats/multiaddr/blob/master/protocols.csv) are URL-esque paths and schemes for addressing endpoints. I think it would be good to have a primitive equivalent to this. These symbols would allow multi-transport clients to route data as needed based on specific application use case. These chain coordinates can then be used as a universal alias for the 'scheme' portion of a URL.
 
 ### Multiformat - Base
-[These](https://github.com/multiformats/multibase/blob/master/multibase.csv) would be useful for understanding a particular text encoding of binary data. I don't know that these are strictly necessary. If this new system is binary instead of text based, then these would really only be needed when transferring data on text based protocols. I personally feel it is up to the transport(address or scheme, from above) to specify encodings in their own way, as the text/binary dichotomy has always existed and is something for the protocol to determine. I think there could be a primitive 'Base' chain, but for the core system, it is not needed. It would mostly be for other systems to use these universal symbols to build their own version of a text based [IPFS CID]()
-
-Not sure if all of 'multiformats' would be on a single chain or multiple. My default is more, simple chains. So looks like 3 chains according to their repo. [Addr](https://github.com/multiformats/multiaddr/blob/master/protocols.csv), [Base](https://github.com/multiformats/multibase/blob/master/multibase.csv), [Codec](https://github.com/multiformats/multicodec/blob/master/table.csv). 
-
-Things I would consider for a 4th chain; Primitives: boolean, utf-8 blob, binary blob, var-int(u/i), fixed length integers (u8,u16...,i8,i16,...), floats of various flavors. Primitives would rarely be expanded, but I could see the early types going up to like u256, so if some app needed a u512, they could still add it. I think all IPFS CIDs are utf-8 that represent binary, and their 'Base' list is how to figure out how to get the right bits out of the string. My preference for the system is everything is binary by default. UI's can make things textual for us humans.
-
-This could allow a new permissionless version of CIDs for use later in our non-DHT synching protocol.
+[These](https://github.com/multiformats/multibase/blob/master/multibase.csv) would be useful for understanding a particular text encoding of binary data. I don't know that these are strictly necessary. If this new system is binary instead of text based, then these would really only be needed when transferring data on text based protocols. I personally feel it is up to the transport(address or scheme, from above) to specify encodings in their own way, as the text/binary dichotomy has always existed and is something for the protocol to determine. I think there could be a primitive 'Base' chain.
 
 # Extending Primitives
 If you are making data machine readable, should you make it machine operatable? If we added another chain for [OPCODES](https://ethereum.org/en/developers/docs/evm/opcodes) we are well on our way to creating a universal (within this system) way to add functions to some sort of new machine semantic programming language. This seems extreme, but that is what is great by having this multi-chain system. We can just create the primitive chain first so we can have numbers and stuff, and then build on top of it later. That is the beauty of linked/semantic data. An interesting extension of this would be adding a suffix to primitives and can build conversion tables. Converting inches to feet or anything else the system has defined could be semantically understood and auto converted.
