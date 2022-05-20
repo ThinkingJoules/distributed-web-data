@@ -292,14 +292,86 @@ There is a dedicated chain to handle PKI updates. Because this can be tokenless,
 WIP VVVVV
 
 # LLI and our Triple
-Heading back to our triple. RDF uses URIs as subject and property identifiers. Atomic Data uses http URLs, as they *should* dereference to the Resource. I like the alteration Atomic Data uses. It allows identifiers to effectively be hyperlinks to learn more about the resource. This really leverages the graph like nature of the *web* on top of the graph like structure of the triples. I think we want to carry this through to the new system. The biggest difference is that I don't want to build on top of DNS. So our URL might still be http, but we will resolve it through a different mechanism. Since we are using the same basic topology as DNS (resolves to a particular, physical server) I think we can leave the scheme portion alone. This can allow http(s), ws(s), etc transports intact. However, the hostname and top level domain, will need some adjustment. Since I like prefixes, I think we should build this new URL in a way that will play nice with our idea of a prefix trie. Like Atomic Data, we could require http as a standard URL transport. 
+Heading back to our triple. RDF uses URIs as subject and property identifiers. Atomic Data uses http URLs, as they *should* dereference to the Resource. I like the alteration Atomic Data uses. It allows identifiers to effectively be hyperlinks to learn more about the resource. This really leverages the graph like nature of the *web* on top of the graph like structure of the triples. I think we want to carry this through to the new system. The biggest difference is that I don't want to build on top of DNS. So our URL might still be http, but we will resolve it through a different mechanism. Since we are using the same basic topology as DNS (resolves to a particular, physical server) I think we can leave the scheme portion alone. This can allow http(s), ws(s), etc transports intact. However, the hostname and top level domain, will need some adjustment. Since I like prefixes, I think we should build this new URL in a way that will play nice with our idea of a prefix trie. Like Atomic Data, we could require http as a standard URL transport.
+
+## A new TLD, A new WorldWideWeb
+If we work in prefixes, then we want to work from top level down, opposite of how domain names work. Logically domain names are com.domainname.subdomain.www. Funnily enough, 'www' is actually [a subdomain](https://www.nexcess.net/blog/is-there-any-reason-to-use-www-in-your-domain/#:~:text=What%20exactly%20is%20the%20%E2%80%9Cwww,Internet%20like%20Gopher%20or%20FTP.) that exists to indicate where the the domain serves webpages from. I never knew that until trying to understand URLs in the context of this project. 
+### A New Start
+To help differentiate DNS URLs from others, I think we should start the URL with a fixed string. For now let's just use 'dweb'. So we have:
+```
+http://dweb.
+```
+If these are going to be our keys (Subject+Property) then having http:// is already 14 bytes (7\*2) of overhead that carries very little information. Tim Berners-Lee [regrets this syntax](https://stackoverflow.com/questions/36433409/why-does-http-contain-two-slashes-and-file-three-in-a-browser-navigation) so I think we can drop the double slashes, and adopt his preferred style with no '.' and all '/'. Now we have:
+```
+http:dweb
+```
+http: is (10 bytes) of overhead. Changing fron '.' to '/' style will also help visually differentiate these from DNS URLs. 
+### Chain Registration
+If we use the idea of chain coordinates and designate some sort of 'Registry Chain' (as the registrar of all 'dweb' chains), then the TLD would effectively be the chain coordinates of the creation transaction. Since this would be a low velocity chain, I would probably make it 1 block = 1 txn, to allow the chain coordinates to be a single number (0 index offset from gensis block of registrar chain). This registrar chain would probably allow a chain to register an alias as well. Since this is *super* low level to the system, we might want to actually reject colliding aliases as part of validation on new transactions. This could make things more human friendly. For the most space efficient identifiers, we would want to use the number (atleast when persisting it on disk) to save on space. We could self-create the 'dweb' chain in the genesis block. This would have coordinate of '0' with and alias 'dweb'. Now we would have something like:
+```
+http:0 = http:dweb
+```
+So for now, let us assume these new TLD's will have unique aliases, but the chain coordinate will be used in any storage or (cryptographic) verification setting.
+### User Namespace (LLI)
+Since the LLI and PKI are needed for authorship let's create that chain next. This would be the second txn in the registrar chain (idx=1,alias=id). Since we will need througput to handle global PKI updates and I'm not sure how sharding would work, let us for now assume that this chain will have blocks and txns (so two numbers) and will only be used as registrar chain for an initial key pair. There is no key rotations on this chain. Logically the PKI is a signature chain, I believe we should be able to handle all the key rotations in a separate, sharded, chain system that can reference the LLI (and thus the original key pair) from the registrar chain. I haven't thought though if this would indeed work, but for now, let us just go with the idea that the LLI is 2D chain coordinate (Block#,Txn in Block). So for some identity created in the 24th block and the 6th txn within the block we might have something like this:
+```
+http:dweb/id/23/5 = http:0/1/23/5
+```
+### Property Defs
+The next most important thing we need, is a way to describe the Semantic (Properties) Defintions. This would be a 1D coordinate chain (idx=2,alias=prop). So the third Definition added would look something like:
+```
+http:dweb/prop/2 = http:0/2/2
+```
+### Other Morphemes
+We would need a couple other chains based on our early discussion:
+- Binary Suffix: 1D, idx=3, alias=fx
+- Language Tags: 1D, idx=4, alias=ltag
+- Unit Definitions: 1D, idx=5, alias=unit
+
+### Subject-Property
+Now we have enough symbols, and a permissionless and universal way to find and allow anyone to add to these (permissionless, but I expect the PoW txn fee to be *very* high). The 'Subject' is basically our LLI from before, we just need to add another '/'. What comes after this? Another unsigned integer? Do we allow characters? If we are allowing offline creations of data, then it may need to be random (to avoid collision on sync), but that can happen with either numbers or alpha-numeric. This can be discussed some more, for now let's keep using uints.
+```
+Subject = http:dweb/id/23/5/1234 = http:0/1/23/5/1234
+Property = http:dweb/prop/2 = http:0/2/2
+```
+If we merklize our PATRICIA trie for generating proofs, then we need to fix the conversion of these URLs to a known binary equivalent. If we bake the 'http:' in to the protocol, then we can elide this in our trie. If everything is unsigned integers, then we could encode those as [u-var-int](https://go.dev/src/encoding/binary/varint.go)s and drop the need for the '/' delimiter. This would turn our prefix trie key in to something like this:
+```
+HumanForm = http:dweb/id/23/5/1234+http:dweb/prop/2
+BinaryForm = 5 u-var-ints (subject) + 3 u-var-ints (property) = 8 u-var-ints concatenated together.
+```
+Since there shouldn't be billions of (property) Definitions we this portion of the key should use less than 6 bytes, with the most common (earliest created) using only 4 bytes. The subject will have 2 bytes of namespace overhead, then probably 3-6 bytes for the LLI portion, and then potentially another 5-8 bytes (depending on how the actual 'subject' id itself is handled). The actual key length will vary, but I would expect to have the binary key (the 8 u-var-ints) ranging in length from 12 bytes to 18 bytes. That is a much better than have the 8 u-var-ints be represented by 8-32b hashes (256 bytes)! If we are doing internet scale data, then we should be concerned about our data footprint!
+
+I think this illustrates another benefit for using blockchains to create hash-like, one to one mappings. We gain serialization through blockchains and we can leverage that property to get savings elsewhere.
+
+## Value
+So we need to work on the Value portion of the triple some more. We still need to address:
+- Suffixes: Binary, Lang, Unit
+- Anonymous Nodes (can we do the 'path' like Atomic Data)
+- CRDT Metadata
+- Metadata
+  - Last Edited By, Last Edited Time, etc.
+
+There is a lot going on with the Value! If we want to be able to create proofs we also need to be careful how we encode all of this so we capture the parts of it that need to be provable, vs what can we edit without changing the 'hash' (for NRD puposes).
+
+### Proofs for NRD
+So I think I should explain a bit about why I keep talking about a merklized PATRICIA trie instead of a vanilla merkle tree. The reason for using a trie, is that it builds deterministically (a regular mekle tree, insertion order changes the resulting hash). This deterministic property allows the proof to also prove *non-inclusion*. In short, we can prove we *do not* have a key since we cannot generate a proof to 'hide' such a key (else determinism has failed us!). 
+
+How is helpful to us? I *believe* this is important to solving the NRD problem. Remember we are only going to put our trie root on chain (32b). If we know what value we want to prove (Subject+Property) then in theory we could ask for a proof to the most recently published root hash. If we wanted to see if they changed the value, we could back to a previously published root and ask for them to prove it there as well. Since we have non-inclusion proofs, we could *know* if it was not created yet. If the value is different, then they clearly edited it. If they cannot provide the proof (they lost merklized PATRICIA trie nodes associated with that snapshot) then we must be wary that they are trying to hide an edit. We can't know what it was, but we can be suspicious of this person (again, we may not 'know' this person). In a sense, being able to build proofs to any previously published root is a sign of trustworthiness. Yes, people can lose data. These look the same. This is the downside by detatching state from the blockchain. The only reason this works when we don't detach state, is that the state is replicated by *every* participant. Do we want to *require* everyone to store all past merkle states for *all* people? No. So this is where some lesser amount of replication falls to the owner of the data. Either people *own* their data and all the responsibilities. This is where making the configuration and setup of running your own server(s) as simple and easy as possible.
+
+The nature of this merklized PATRICIA trie is a Copy-on-Write scheme. So the total state grows by two mechanisms. First, the more changes between commits, the more new intermediate nodes are created. Second, the more often you commit, the more state you create. For example if you make 1 edit per commit and each of the edits has a trie depth of 10. Then each commit will generate 10 new trie nodes. If you are trying to minimize disk usage, you should try to commit (at least publish) as few commits as possible. However, if you don't want latency in publishing your data then you will commit often with only a couple of changes in each commit. This is the tradeoff. 
+
+### CRDTs for Repudiable Data
+I know very little about CRDTs, but I have used GunDB (CRDT based) and it works really well and is performant. I don't know how much overhead it has, or if it can be improved. I think CRDTs will be used on all data, even the NRD. It is so simple to merge data from multiple sources. I think of it a bit like a funnel that would helps get data in to our prefix trie.
+
+(GunDB uses a trick with its CRDTs to keep people honest with their timestamps: It doens't trigger the application of the data until your local time is > than the CRDT timestamp. If everyone does this, then people should only ever want to publish timestamps that are as recent as the average expected clock time on the network. If you publish something in the future, no one will see it (or it might be forgotten if too far) until they think it is the time you indicated. The game theory basically works out to, keep your local clock accurate and be honest.)
+
+### Our Value Object
+
 
 
 -----------
-- Key Segments/Encoding
 - CRDT/Value Metadata/Value Object
-- Chain Topology/Validators/Core Chains
-- 
+
 
 
 
