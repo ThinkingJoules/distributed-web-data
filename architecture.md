@@ -271,10 +271,6 @@ Exchanging of tokens is something that should happen in a paradigm optimized for
 
 So if we **must** do snapshots, then I propose we focus on making verification and discovery very fast. We want to make obtaining the effect of approach #1 as easy as possible.
 
-
-----------
-WIP
-
 # Digital Identity
 As discussed in the summary, we need a Long Lived Identifier (LLI) to represent a user/author to allow more than one key and key rotations. This PKI system would absolutely need to be on a blockchain, as it is the foundation to knowing if signatures are correct and verifying authorship. I think we could use the tokenless blockchain architecture again. This would allow new users to acquire an LLI without needing a token. Being tokenless is vital to lowering friction and thus increasing user adoption. The LLI is the first step to entering this new data paradigm. Here are the roles that the LLI fulfills:
 - Used as a (static) namespace (Domain) for the users data identifiers.
@@ -292,70 +288,19 @@ To avoid talking about specific implementation details, I will rougly summarize 
 
 There is a dedicated chain to handle PKI updates. Because this can be tokenless, we can shard this to help scale it up. We cannot detach the state transitions or use the snapshot method, since we must always validate all keys and signatures to ensure no violations occur.
 
+-------------
+WIP VVVVV
+
 # LLI and our Triple
-Heading back to our triple. RDF uses URIs as subject and property identifiers. Atomic Data uses http URLs, as they *should* dereference to the Resource. I like the alteration Atomic Data uses. It allows identifiers to effectively be hyperlinks to learn more about the resource. This really leverages the graph like nature of the *web* on top of the graph like structure of the triples. I think we want to carry this through to the new system. The biggest difference is that I don't want to build on top of DNS. So our URL might still be http, but we will resolve it through a different mechanism. Since we are using the basic topology as DNS (resolves to a particular, physical server) I think we can leave the scheme portion alone. This can allow http(s), ws(s), etc transports intact. However, the hostname and top level domain, will need some adjustment. Since I like prefixes, I think we should build this new URL in a way that will play nice with our idea of a prefix trie. Like Atomic Data, we could require http as a standard URL transport. 
+Heading back to our triple. RDF uses URIs as subject and property identifiers. Atomic Data uses http URLs, as they *should* dereference to the Resource. I like the alteration Atomic Data uses. It allows identifiers to effectively be hyperlinks to learn more about the resource. This really leverages the graph like nature of the *web* on top of the graph like structure of the triples. I think we want to carry this through to the new system. The biggest difference is that I don't want to build on top of DNS. So our URL might still be http, but we will resolve it through a different mechanism. Since we are using the same basic topology as DNS (resolves to a particular, physical server) I think we can leave the scheme portion alone. This can allow http(s), ws(s), etc transports intact. However, the hostname and top level domain, will need some adjustment. Since I like prefixes, I think we should build this new URL in a way that will play nice with our idea of a prefix trie. Like Atomic Data, we could require http as a standard URL transport. 
+
+
+-----------
+- Key Segments/Encoding
+- CRDT/Value Metadata/Value Object
+- Chain Topology/Validators/Core Chains
+- 
 
 
 
-
-
-
-
-
-Atomic Data uses http URL's that must dereference to the subject. Is this a usecase our new ideas could integrate with? For property definitions, I don't think so. Putting them in chain form, gives us many advantages. But that is really a constraint for what the 'Property' must look like. Does the Subject contain our user namespace? If it does, then I don't think we can, as a DNS URL would need some other way for understanding what key is 
-
-
-
-
-
-
-## Subject "Resource" and Reification
-How do we talk ***about*** other users data ***from our data***. Things like comments or reactions. It is our data (since we authored it) but it must reference someone elses data. 
-
-
-
-
-
-
-So we have a better way of using the core concepts of RDF through Atomic Data. However I feel there is still something fundamentally missing to properly describe things.
-
-
-
-
-
-
-
-
-
-
-
-# Creating Symbols
-## Assumptions
-- PoS chains have irreversability once finalized
-- Attacker cannot reorder blocks, only take it offline
-  - What would recovery from an attack look like?
-
-If these assumptions hold we can use chain coordinates as very short (compared to hashes) as identifiers/symbols.
-## Blockchains for PKI
-unavoidable, cite BlueSky proposal.
-### Enables replacement of DNS
-BlueSky/Gun/AD requires DNS. We need a namespace.
-
-## Blockchains as databases
-### State and Seperation of Concerns
-The problem with [blockchains](https://github.com/ThinkingJoules/distributed-web-data/wiki/Blockchains), is that everything on a single chain must be communicated to every participant. Avalanche and Polkadot solve this problem with creating 'subnets' and 'parachains' respectively. The main idea is to not encumber validators in state they don't care about. 
-
-Using this pattern would allow people who perhaps only care about certain aspects of the system to contribute resources only to the things they care about. Perhaps they really care about the Property Definition Chain and can run it easily on a Raspberry Pi. Whereas a monolithic single chain, such as Ethereum, every node needs to be massive to deal with the communication/computational/storage requirements.
-### Example of a Simplified Chain
-A concrete example of an extremely simple chain-as-database: you could have each block in the chain simply be a single transaction (given the chain is low velocity) and the payload simply be a JSON object that follows the schema rules for that chain (VM is really just a schema validator). Each block, in essence becomes just a row in a table.
-
-Obviously the VM can be as complex or simple as you want when it comes to validation logic. I'm just trying to illustrate how simple a subchain as database could be. 
-
-### Summary
-If we use something like the Avalanche or Polkadot design but do it in a [tokenless]() manner, we get permissionless data tables without needing to acquire a token to either validate or append to the log. Consideration on the platform design:
-- What chains are considered 'Core' and all get validated by ALL validators?
-  - For example, in Avalanche there are 3 chains (P,X,C) that ALL must be validated together.
-- What are all the various ways a chain might be configured? What requirements does the registration chain have?
-- Could we have a few different 'Registration' Chains that create there own unique subset of subchains with their own 'scaffolding' rules?
-  - This is mostly an idea to lower configuration costs create self-similarity so generic software might be able to be used to validate a large variety of chains without needing 'special' software for each one.
 
