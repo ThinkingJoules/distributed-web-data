@@ -14,17 +14,17 @@ Below are some requirements ***I believe*** need to be upheld in order to get wi
 - Federated: The core difference between my approach and some other dApp approaches, is I prefer to gain privacy through a federated model, instead of *requiring* encryption (DHT/widely replicated). This requires a way to set permissions on who can access what. 
   - I think content addressing and encryption can and probably will be used, but first and foremost, data sits at end points (like an IP Address).
 - Accessible: No acquiring tokens in order to use the system. Ideally little to no money should be needed.
-- Permissionless: This system does not aggregate any content, so there is no reason to do censoring or curation of content creation at this low level. Systems built on top of this have to deal with it. Adding new semantic symbols also needs to be available to anyone.
+- Permissionless: This system does not aggregate any content, so there is no reason to censor or curate content creation at this low level. Systems built on top of this have to deal with it. Adding new semantic symbols also needs to be available to anyone.
 - Discoverable: Underlying core primitives are easily found. These core primitives then enable universal queries for p2p discovery of content. 
 - Verifiable: Digital Signatures to verify authorship.
 
 # TL;DR
-I am proposing a new system [tentatively dubbed](https://github.com/ThinkingJoules/distributed-web-data/issues/1) Digital Reality (DR). It aims to meet the requirements listed above better than the current alternatives, by combining some underlying components together:
+I will try to lay out a proposal that meets the requirements listed above better than the current alternatives, by combining some underlying components together:
 - Shared semantic symbols for interoperable data
 - Query language built from core semantic symbols
 - Digital Identity (PKI system) used as a namespace to store user data, and build a DNS-like endpoint resolver
 ## Quick Compare To Other Systems
-- The data model is based off a lineage of projects RDF -> Solid -> Atomic Data
+- The data model is based on a lineage of projects RDF -> Solid -> Atomic Data
   - The data model (like the ones listed above) is conceptually based on a 'Triple'
   - A Triple is the result of decomposing tables. A single Triple is basically a 'cell'.
 - You could probably fit the data model into GunDB, but GunDB isn't 'easy' to set up in a federated manner.
@@ -36,7 +36,7 @@ The data model is the unifying mechanism. Regardless of how or where the data is
 # Quick Summary (11 minute read)
 There has always been a large amount of interest in taking back control of our digital lives; this is only going to grow. I do not think I am necessarily the right person to solve this problem, but I have been searching for and reading many discussions on how to 're-decentralize the web'. So I wanted to try to reconcile some common ideas and approaches and try my hand at positing a complete system. This is a quick run through of my why and how. 
 
-[Find a detailed explanation of the how, here](https://github.com/ThinkingJoules/distributed-web-data/blob/main/architecture.md).
+[Find a detailed explanation of the architecture here](https://github.com/ThinkingJoules/distributed-web-data/blob/main/architecture.md).
 
 ## Defining the Problem
 Current (centralized) apps are authoritative, in that they control your data, and the questions you can ask about it (API). If all data becomes unsiloed (user-owned/portable), should apps still be authoritative in the symbols and semantics they use to describe the data relevant to their app? If they are not authoritative, how will developers have any way to understand data created and labeled by other developers through different 'apps' (UIs)?
@@ -72,11 +72,10 @@ So let's list reasons often cited for **not** using blockchains:
 - Can't delete old data. (Sensitive information cannot be 'on-chain'.)
 
 So we can't, and don't want to, simply put all the data on a blockchain. This is a terrible idea. Does this mean we cannot use blockchains at all? Let's look at the above critiques and see what they are really criticizing:
-- Tokens are usually used to incentivize securing the blockchain. But we only need this security to secure...the tokens. Tokens can only have an exchange rate, if you can actually exchange them, on chain. If you don't have tokens (or tokens that can't be traded...which aren't really tokens then, are they?) then you have no extractable value (nothing to secure). Scams become impossible and we have removed an onboarding step for participants (i.e. acquiring the token).
-  - If you remove the ability to trade tokens from the blockchain construction, is it still a blockchain? Without going into detail here, you could call it a Blockchain (-Token) or an Append-Only Log (+Permissionless +Txn Fees +Consensus...etc.). 'Tokenless Blockchain' still seems the most apt descriptor.
-- "Not scalable": This complaint originated in the context of internet-scale payment networks. Do we need that much throughput?
-  - For social-like apps, non-repudiable data is perhaps an issue. It depends on whether we want *all* state changes recorded, or simply snapshots of previous states. If we need the former, then throughput is crucial. If we can do the latter, then it is a matter of *how many* state snapshots we can capture (up to throughput). This is a key distinction that needs to be thought about.
-  - Note: I think removing the token/value from a blockchain can make it much easier to shard, and gain horizontal scaling to meet higher throughputs.
+- Tokens are usually used to incentivize securing the blockchain. But we only need this security to secure...the tokens. Tokens can only have an exchange rate, if you can actually exchange them, on-chain. If you don't have tokens (or tokens that can't be traded...which aren't really tokens then, are they?) then you have no extractable value (nothing to secure). Scams become impossible and we have removed an onboarding step for participants (i.e. acquiring the token).
+  - If you remove the ability to trade tokens from the blockchain construction, is it still a blockchain? Without going into detail here, you could call it a Blockchain (-Token) or an Append-Only Log (+Permissionless +Txn Fees +Consensus +Sybil Resistant...etc.). 'Tokenless Blockchain' still seems the most apt descriptor.
+- "Not scalable": This complaint originated in the context of internet-scale payment networks (token-based blockchains). If we continue to consider a tokenless construction, then how much throughput we need is based on the usecase of any particular chain.
+  - Additionally, is it possible that getting rid of the token allows more flexibility in scaling blockchains?
 - "Can't delete old data/Sensitive info can't be on-chain": This is true. But if we are not trading tokens, and are instead creating semantic symbols...would we ever want old data deleted?
 
 If we could temporarily buy the idea that many aspects of blockchain don't have to be a detriment, and other aspects could be beneficial, then we could perhaps consider the usage of them as *part* of a new system. What if we put *some* data on a blockchain, without a token? And then combine that blockchain(s) with parts of the other systems listed above?
@@ -89,14 +88,17 @@ If we think the 'triple' is a powerful primitive, let's see what happens if we p
 - We gain a central place in which to enforce a known format for wide consumption and understanding.
 - Through centralized (but permissionless) creation, we know exactly how and where to find all known definitions. This allows easy discoverability and reuse, no web-crawling needed.
 - All participants of the Property Definition blockchain would replicate the state, to ensure that definitions are always reachable (online).
+- We could point backwards to updates on old symbols to create a clear lineage of changes. Reading through the chain would yield all symbols, as well as related/updated symbols.
 
 Scalability is not a problem. For example: let's say a language has ~1,000,000 words (average adult knows up to 35,000 words in their native language). If each of these need to be used as a 'property' then even with the worst performing blockchain (Bitcoin) with a throughput of about 4 transactions per second, you could put all of those on chain in about 70 hours. Even with combinatorics and nuance, the slowest of all the blockchains would still have enough throughput to add definitions faster than people could use them. 
 
-For our ends, does that mean blockchains are too scaleable, because they are permissionless?? I would argue that we would absolutely **need** to slow things down immensely, at least for the Property Definition use case. We cannot simply detect and reject semantically equivalent properties, so we would still need a mechanism to nudge people to search for and attempt to reuse existing definitions. Generally blockchains have transaction fees (denominated by the token) to prevent excessive state-growth to the chain. A tokenless transaction fee could be done through a fair proof of work algorithm.
+For our ends, does that mean blockchains are *too* scalable, because they are permissionless?? I would argue that we would absolutely **need** to slow things down immensely, at least for the Property Definition use case. We cannot simply detect and reject semantically equivalent properties, so we would still need a mechanism to nudge people to search for and attempt to understand/reuse existing definitions. Generally blockchains have transaction fees (denominated by the token) to prevent excessive state-growth to the chain. A tokenless transaction fee could be done through a fair proof of work algorithm. We could create a pseudo voting system where new transactions expire if they don't meet enough PoW threshold by a certain time. This could allow many developers to observe, read, and discuss new symbols and add work (vote) in order to get them accepted into the canonical list of all properties. Symbols could still be added unilaterally but would require a single person to run enough computers (expense) to 'force' the transaction through alone. This is still permissionless, but here we are *purposefully adding friction* to help curate the list of symbols.
 
-So...if we now have addressable semantic symbols from this Properties Definition chain, then we could use these symbols in other, **non-blockchain** systems. Now two different developers have a known, common 'dictionary' of properties to aid in searching for data or integrating data to a synthetic UI. These symbols could in fact be used to augment existing dApps, such as GunDB, to improve interoperability/composability.
+Conversely, in a usecase requiring non-repudiable data (e.g. social-like apps), we need more throughput than any blockchain system in existence currently offers. Are these usecases hopeless in a distributed web environment? Not necessarily: all blockchains in existence are built around the token. I think removing the token from a blockchain can make it much easier to shard, and gain horizontal scaling to meet higher throughputs. We don't need the double-spend property that token-based chains require. But we would still have the guarantee of a single history provided by a diverse set of actors recording snapshots of data.
 
-(Note: There are many nuanced issues that still need to be solved, but I think the pattern above could be re-used to accomplish many of them. Thus creating a self-similar system. Read the [detailed write up](https://github.com/ThinkingJoules/distributed-web-data/blob/main/architecture.md) if you want to dive into the deep end.)
+So assuming even the hardest usecase might be possible to handle, let's go back to the Property Definitions. If we now have addressable semantic symbols from this Properties Definition chain, then we could use these symbols in other, **non-blockchain** systems. Now two different developers have a known, common 'dictionary' of properties to aid in searching for data or integrating data to a synthetic UI. These symbols could in fact be used to augment existing dApps, such as GunDB, to improve interoperability/composability.
+
+(Note: There are obviously many nuanced issues that still need to be solved, but I think the pattern above could be re-used to add other primitive symbols that the entire system relies on. Thus creating a self-similar developer experience. Read the [detailed architecture write up](https://github.com/ThinkingJoules/distributed-web-data/blob/main/architecture.md) if you want to dive into the deep end.)
 
 
 ### User Namespace: A place for data to reside
@@ -104,17 +106,27 @@ Given that we want the ability to fully control our data, we need a way to make 
 
 The original web is built around DNS and Domain Names. The domain name acts as a namespace prefix as well as a static identifier to find the current IP Address (where the data for that Domain resides). This is a permissioned and centralized system that has worked well: Human Friendly and Unique (there is only **one** google.com). The problem is that requiring a user to purchase a domain name seems no different than needing a user to purchase a token to use a blockchain. (The combination of human friendly and unique, is exactly what characterizes the digital tokens called NFTs.) 
 
-(Hypothetically IPFS is an alternative to DNS, however, we do not consider IPFS at this level, because the content does not have a location OR a namespace, it is purely a hash. An IPFS-like approach should be used lower in this system.)
+(Hypothetically IPFS is an alternative to DNS, however, we do not consider IPFS at this level, because the content does not have a location OR a namespace, it is purely a hash. An IPFS-like approach should be used lower in this system. We are using a federated system at the high level.)
 
 To create a low friction and accessible User Namespace (Domain), I propose that it be tied to the one known mechanism that gives users the ability to verify themselves digitally: Public Keys.
 
-Both GunDB and Atomic Data use a single key-pair to prove authorship of data. I think it is essential to both allow more than one key, but also to keep some sort of Long Lived Identifier (LLI) that remains constant across key changes. To do this we will need a special (tokenless) blockchain that deals with all the PKI key rotations. The LLI would be derived from the transaction that creates a new identity. This will create a unique, but not-human-friendly symbol.
+Both GunDB and Atomic Data use a single key-pair to prove authorship of data. I think it is essential to both allow more than one key, but also to keep some sort of Long Lived Identifier (LLI) that remains constant across key changes. To do this we will need a special ([tokenless](https://github.com/ThinkingJoules/distributed-web-data/blob/main/tokenless-blockchain.md)) blockchain that deals with all the PKI key rotations. The LLI would be derived from the transaction that creates a new identity. This will create a unique, but not-human-friendly symbol. (I think using a blockchain here is inevitable. Even the BlueSky ADX proposal uses a [permissioned append only log for their PKI](https://github.com/bluesky-social/adx/blob/main/architecture.md#the-did-consortium).)
 
 Leveraging this new primitive (LLI) we can now create a system that can act as a way to resolve IP addresses (or equivalent). We can extend this system to allow Human-Friendly-Alias(es). However, to avoid making things token-like, we must allow collisions of names. This has the potential for confusion, but I think there are ways to help minimize that.
 
-(Again, read the [detailed write up](https://github.com/ThinkingJoules/distributed-web-data/blob/main/architecture.md) if you want more info.)
+(Again, read the [detailed architecture write up](https://github.com/ThinkingJoules/distributed-web-data/blob/main/architecture.md) if you want more info.)
 
 ## Bringing it all together
-We use tokenless blockchains to generate symbols, to which we can associate semantic meaning. These symbols are used in a Triple-like data model. The hope is to have maximum reuse of the Property symbols. A blockchain provides a central way to find all 'defined' Properties for indexing and easy searching for everything already defined. Using the Identity chain, we can build DNS-like resolvers to connect these semantic databases together. The shared semantic symbols can allow for a query language to act as an omni-API to build any potential UI.
+We use tokenless blockchains to generate both LLIs (user address/Domains) and core semantic symbols. We make these tokenless blockchains addressable through [chain coordinates](https://github.com/ThinkingJoules/distributed-web-data/issues/2). Putting these bits together we can make a new non-DNS resolved URL. These URLs are used in a Triple-like data model, as they were in RDF/AD. 
+
+We gain immutability of the core symbols through the append-only nature of blockchains. We gain addressability of these symbols through chain coordinates. We gain discoverability due to the centralized (but permissionless) nature of using a blockchain.
+
+Leveraging the discoverability of the core symbols, we should gain maximum reuse to ensure a widely understood set of symbols. These core symbols can then be integrated into a query language that will act as a universal API for all 'apps' (UIs). We have now gained interoperability 🎉. 
+
+(Important aside: The query language can be flexible and there is no worry of lock-in, because the underlying symbols are in a shared, yet addressable format, independent of anything else. I think the URLs will be http resolved, so we could simply use GET requests similar to how AD operates currently. I think a more complex option will be needed as well, but I expect several simultaneous methods to ask about data to be available at once.)
+
+We can further extend this system to attempt to solve the non-repudiable data problem. I personally feel that blockchains are required here as well. I go into my reasoning in great length in the full architecture writeup (linked below). I believe this is the hardest part of the system, and would love to have a discussion exploring ways of solving it that differ from my own. 
+
+(Of course if you see anywhere my reasoning is faulty, please open an issue to discuss! I know I'm not an expert and welcome feedback!)
 
 [Find the full Architecture outline here](https://github.com/ThinkingJoules/distributed-web-data/blob/main/architecture.md).
