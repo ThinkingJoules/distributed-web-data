@@ -6,7 +6,7 @@ This would be for non-monetary chains. Something closer to blockchain as a datab
 
 These chains would be used as a central, permissionless database to describe labels we use in the data model for this overall project. These labels don't *need* a blockchain, but the 'central' (known network, with a way to find the entire set of participants) creation avoids the need to crawl the web and 'find' other labels. This has the added benefit of being *able to* reject things that have a namespace collision (if desired — however, I think we probably need to allow collisions of 'shortnames'). It also allows an easy way to follow updates to previous descriptions.
 
-I think something like this could also be used for the PKI chain, as well as for dealing with non-repudiable data.
+I think something like this could also be used for the PKI chain, as well as for dealing with non-repudiable data. These two usecases would need to scale to high throughput. The PKI chain is particularly interesting, as each users PKI is effectively a signature chain that simply needs to be widely observed to ensure the signature chain is following rules for proper key updates.
 
 # Tokenless
 Given the purpose above, I would want the core protocol permissionless and accessible. Acquiring tokens to pay txn fees or use the network is NOT accessible enough. It creates too much friction for onboarding.
@@ -18,7 +18,7 @@ I would use a fair and accessible Proof of Work (PoW) function such as RandomX f
 ## Normal PoS Systems
 Validators 'put stake' in a validation period and earn a reward if they meet some sort of uptime or other protocol defined requirement during said time/block period. 
 ## The Twist
-I would envision the mining of your stake happening before you start validating. You then 'reward' the entire stake to their NodeID if they met the uptime. Reading through the chain, you could then determine their 'total' stake and get a distribution of 'heavier' nodes. This would be the Sybil protection. Of course, each staking period would need a minimum to help limit nodes to 'serious' nodes.
+I would envision the mining of your stake happening before you start validating. You then 'reward' the entire stake to their NodeID if they met the uptime. Reading through the chain, you could then determine their total 'stake' and get a distribution of 'heavier' nodes. This would be the Sybil protection. Of course, each staking period would need a minimum to help limit nodes to 'serious' nodes.
 ## Losing Stake
 We would need a 'slashing' rule if you fail to meet the validation period requirements (uptime, etc.). 
 
@@ -45,3 +45,9 @@ I still need to fully understand *how* irreversible state is in SnowBall, and ho
 
 I still don't fully understand all the nuances of SnowBall consensus, as it is first in a new class of consensus protocols (leader-less). If anyone has a handle on it and can answer my questions, please reach out!
 
+# Scaling
+By removing the token/transfers, we no longer need to worry about the double spend problem. We only need to worry about colluding chain re-writes. We are using this form of blockchain for:
+- Getting a diverse set of actors to enforce the rules/observe
+- Acting as some form of permissionless Registrar (central log of core data)
+
+I believe that doing things of this nature can give us more flexibility in how we shard the network to gain horizontal scaling. We don't need *every* observer validating everything. We just need *enough* observers to reduce the chance that an entire shard could collude to allow some subset of info to be rewritten. The game theory changes quite a bit when there is no liquid/extractable value. All that I know about sharding blockchains is in the context of token-based chains. I know that it basically never works out well. In short, it is very difficult. Since we using blockchains slightly differently I think we need to re-examine sharding techniques through a different lens. I don't have any particular approach in mind, but I think we just need to be careful to not write-off techniques that have been discarded by the token-based chains.
