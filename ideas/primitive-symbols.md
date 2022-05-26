@@ -1,10 +1,10 @@
-# Ask Why
-The goal of this document is to explore, in depth, how we find/create Atomic Data's "Property Definitions" (PD for short throughout this document). (This could also be generalized and re-stated as: How to we find/create widely understood Symbol->Semantic Meaning mappings in the context of the distributed web?)
+# Goal
+The goal of this document is to explore, in depth, how we find/create Atomic Data's "Property Definitions" (PD for short throughout this document). (This could also be generalized and re-stated as: How do we find/create widely understood Symbol->Semantic Meaning mappings in the context of the distributed web?)
 
 We first need to agree on the requirements, and then we can explore the known options for how to meet those requirements and accomplish our goal.
 
 # Define Requirements
-These initial requirements were from a discussion between me and @joep.
+These initial requirements were from a discussion between me and @joepio.
 
 - Immutable — Symbol -> Definition mappings cannot be updated directly.
 - Discoverable — Developers need to be able to easily find ALL definitions created by ANYONE. This is needed for maximum symbol reuse. (Ideally we could find 'updates' to older symbols easily as well. Call these 'Synonyms'.)
