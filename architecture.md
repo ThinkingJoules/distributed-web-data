@@ -300,54 +300,51 @@ If we work in prefixes, then we want to work from top level down, opposite of ho
 ### A New Start
 To help differentiate DNS URLs from others, I think we should start the URL with a fixed string. For now let's just use 'dweb'. So we have:
 ```
-http://dweb.
+http://dweb
 ```
-If these are going to be our keys (Subject+Property) then having http:// is already 14 bytes (7\*2) of overhead that carries very little information. Tim Berners-Lee [regrets this syntax](https://stackoverflow.com/questions/36433409/why-does-http-contain-two-slashes-and-file-three-in-a-browser-navigation) so I think we can drop the double slashes, and adopt his preferred style with no '.' and all '/'. Now we have:
-```
-http:dweb
-```
-http: is (10 bytes) of overhead. Changing from '.' to '/' style will also help visually differentiate these from DNS URLs. 
+If these are going to be our keys (Subject+Property) then having http:// is already 14 bytes (7\*2) of overhead that carries very little information. Tim Berners-Lee [regrets this syntax](https://stackoverflow.com/questions/36433409/why-does-http-contain-two-slashes-and-file-three-in-a-browser-navigation) so I think we can adopt his preferred style with no '.' and all '/'. Changing from '.' to '/' style will also help visually differentiate these from DNS URLs. 
+
 ### Chain Registration
 If we use the idea of chain coordinates and designate some sort of 'Registry Chain' (as the registrar of all 'dweb' chains), then the TLD would effectively be the chain coordinates of the creation transaction. Since this would be a low velocity chain, I would probably make it 1 block = 1 txn, to allow the chain coordinates to be a single number (0 index offset from genesis block of registrar chain). This registrar chain would probably allow a chain to register an alias as well. Since this is *super* low level to the system, we might want to actually *reject* colliding aliases as part of validation on new transactions. This could make things more human friendly. For the most space efficient identifiers, we would want to use the number (at least when persisting it on disk) to save on space. We could self-create the 'dweb' chain in the genesis block. This would have coordinate of '0' with and alias 'dweb'. Now we would have something like:
 ```
-http:0 = http:dweb
+http://0 = http://dweb
 ```
 So for now, let us assume these new TLD's will have unique aliases, but the chain coordinate will be used in any storage or (cryptographic) verification setting.
 ### User Namespace (LLI)
 Since the LLI and PKI are needed for authorship let's create that chain next. This would be the second txn in the registrar chain (idx=1,alias=id). Since we will need throughput to handle global PKI updates and I'm not sure how sharding would work, let us for now assume that this chain will have blocks and txns (so two dimensional) and will only be used as a registrar chain for an initial key pair. There is no key rotations on this chain. Logically each users PKI is a signature chain, I believe we should be able to handle all the key rotations in a separate, sharded, chain system that can reference the LLI (and thus the original key pair) from the registrar chain. I haven't thought through if this would indeed work, but for now, let us just go with the idea that the LLI is a 2D chain coordinate (Block#,Txn in Block). So for some identity created in the 24th block and the 6th txn within the block we might have something like this:
 ```
-http:dweb/id/23/5 = http:0/1/23/5
+http://dweb/id/23/5 = http://0/1/23/5
 ```
 This is basically our new 'full' domain. This is what should resolve to this particular user's public endpoint. The 'dweb/id/' is basically the 'TLD', and the '23/5' is the 'Domain'. The two uints is basically this users identifier, and what we will be using to build an IP Address resolver and associate Human-Friendly-Alias(es) to.
 ### Semantic Definitions
 The next most important thing we need, is a way to describe the Semantic (Properties) Definitions. This would be a 1D coordinate chain (idx=2,alias=def). So the third Definition added would look something like:
 ```
-http:dweb/def/2 = http:0/2/2
+http://dweb/def/2 = http://0/2/2
 ```
 ### Other Morphemes
 We would need a couple other chains based on our early discussion:
 - Binary Suffix: 1D, idx=3, alias=fx
-  - The 32nd fx would be: http:dweb/fx/31 = http:0/3/31
+  - The 32nd fx would be: http://dweb/fx/31 = http://0/3/31
 - Language Tags: 1D, idx=4, alias=ltag
-  - The 1st ltag would be: http:dweb/ltag/0 = http:0/4/0
+  - The 1st ltag would be: http://dweb/ltag/0 = http://0/4/0
 - Unit Definitions: 1D, idx=5, alias=unit
-  - The 8th unit would be: http:dweb/unit/7 = http:0/5/7
+  - The 8th unit would be: http://dweb/unit/7 = http://0/5/7
 
 ### Property Word Def
 We would need another chain to describe the actual full combination that make a 'Word' to define the 'Property' (idx=6, alias=prop). An example:
 ```
-http:dweb/prop/33 = http:0/6/33
+http://dweb/prop/33 = http://0/6/33
 ```
 
 ### Subject-Property
 Now we have enough symbols, and a permissionless and universal way to find and allow anyone to add to these (I expect the PoW txn fee to be *very* high for some of these). The 'Subject' is basically our LLI from before, we just need to add another '/'. What comes after this? Another unsigned integer? Do we allow characters? If we are allowing offline creations of data, then it may need to be random (to avoid collision on sync), but that can happen with either numbers or alpha-numeric. This can be discussed some more, for now let's keep using uints.
 ```
-Subject = http:dweb/id/23/5/1234 = http:0/1/23/5/1234
-Property = http:dweb/prop/33 = http:0/6/33
+Subject = http://dweb/id/23/5/1234 = http://0/1/23/5/1234
+Property = http://dweb/prop/33 = http://0/6/33
 ```
-If we merklize our PATRICIA trie for generating proofs, then we need to fix the conversion of these URLs to a known binary equivalent. If we bake the 'http:' in to the protocol, then we can elide this in our trie. If everything is unsigned integers, then we could encode those as [u-var-int](https://go.dev/src/encoding/binary/varint.go)s and drop the need for the '/' delimiter and allow a fully binary key. This would turn our prefix trie key in to something like this:
+If we merklize our PATRICIA trie for generating proofs, then we need to fix the conversion of these URLs to a known binary equivalent. If we bake the 'http://' in to the protocol, then we can elide this in our trie. If everything is unsigned integers, then we could encode those as [u-var-int](https://go.dev/src/encoding/binary/varint.go)s and drop the need for the '/' delimiter and allow a fully binary key. This would turn our prefix trie key in to something like this:
 ```
-HumanForm = http:dweb/id/23/5/1234 + http:dweb/prop/33
+HumanForm = http://dweb/id/23/5/1234 + http://dweb/prop/33
 BinaryForm = 5 u-var-ints (subject) + 3 u-var-ints (property) = 8 u-var-ints concatenated together.
 ```
 Since there shouldn't be billions of Property Words, this portion of the key should use less than 6 bytes, with the most common (earliest created) using only 4 bytes. The subject will have 2 bytes of namespace overhead, then probably 3-6 bytes for the LLI portion, and then potentially another 4-8 bytes (depending on how the actual 'subject' id itself is handled). The actual key length will vary, but I would expect to have the binary key (the 8 u-var-ints) ranging in length from 12 bytes to 18 bytes. That is a lot of information in something that is less length than a single hash! If we are doing internet scale data, then we should be concerned about our data footprint!
@@ -403,7 +400,7 @@ Atomic Data uses an inline map, using the Property (resource) as a key.
 
 Before we had this as our 'key':
 ```
-HumanForm = http:dweb/id/23/5/1234 + http:dweb/prop/33
+HumanForm = http://dweb/id/23/5/1234 + http://dweb/prop/33
 BinaryForm = 5 u-var-ints (subject) + 3 u-var-ints (property) = 8 u-var-ints concatenated together.
 ```
 If we swap the '+' for ' ' in the HumanForm, it sort of looks like AD's path. It is 'Subject' + 1 or more 'Properties'. Obviously in our prefix trie, we always have exactly Subject+Property. The anonymous node is technically part of the 'Value' and so we lose out on any 'auto' indexing or querying we might build in at the high level. This would indicate that we shouldn't make them anonymous, and instead just point to another resource, making it a graph. To me, it feels like, we either make binary suffixes introspectable and addressable, or we make them opaque to the 'high level' system. Making them opaque would turn the data structure much more heavily in to graph territory. There are many options for graph query language that we could adapt. Remember, we can still use a basic http query for non-complex queries.
@@ -418,20 +415,20 @@ Either way, this line of thinking leads nicely into how to prove other pieces of
 ### Extended Trie Key
 This will follow a bit like our time log idea, except we will be working with the individual components of the Value. We could address the components as (in HumanForm):
 ```
-http:dweb/id/23/5/1234 + http:dweb/prop/2 + data = binaryBlob
-http:dweb/id/23/5/1234 + http:dweb/prop/2 + crdt = crdtMetadataBlob
-http:dweb/id/23/5/1234 + http:dweb/prop/2 + lastEditedBy = LLI
-http:dweb/id/23/5/1234 + http:dweb/prop/2 + lastEditedTime = unixTS
-http:dweb/id/23/5/1234 + http:dweb/prop/2 + http:dweb/fx/ = 31 (would logically be: http:dweb/fx/31)
-http:dweb/id/23/5/1234 + http:dweb/prop/2 + http:dweb/ltag/ = 0
-http:dweb/id/23/5/1234 + http:dweb/prop/2 + http:dweb/unit/ = 7
+http://dweb/id/23/5/1234 + http://dweb/prop/2 + data = binaryBlob
+http://dweb/id/23/5/1234 + http://dweb/prop/2 + crdt = crdtMetadataBlob
+http://dweb/id/23/5/1234 + http://dweb/prop/2 + lastEditedBy = LLI
+http://dweb/id/23/5/1234 + http://dweb/prop/2 + lastEditedTime = unixTS
+http://dweb/id/23/5/1234 + http://dweb/prop/2 + http://dweb/fx/ = 31 (would logically be: http://dweb/fx/31)
+http://dweb/id/23/5/1234 + http://dweb/prop/2 + http://dweb/ltag/ = 0
+http://dweb/id/23/5/1234 + http://dweb/prop/2 + http://dweb/unit/ = 7
 
 ```
-In theory we could define them all as properties, but the suffix tags already have a known name space so we could use those directly instead of a layer of indirection. If this structure is going to be fixed per the protocol, do we gain anything by making these 'Properties'? Just using '/data' would technically work. This will need to be hard coded in to the client anyway, and all of these are quite self-explanatory. However, 'data' is 4 bytes, whereas 'http:dweb/prop/9' would only be 3 when encoded. So, perhaps just using a property def is best: it is well formed, well understood, and can be directly dereferenced for documentation sake.
+In theory we could define them all as properties, but the suffix tags already have a known name space so we could use those directly instead of a layer of indirection. If this structure is going to be fixed per the protocol, do we gain anything by making these 'Properties'? Just using '/data' would technically work. This will need to be hard coded in to the client anyway, and all of these are quite self-explanatory. However, 'data' is 4 bytes, whereas 'http://dweb/prop/9' would only be 3 when encoded. So, perhaps just using a property def is best: it is well formed, well understood, and can be directly dereferenced for documentation sake.
 
 To allow an upgrade path for changing the shape of the Value, we could add a version segment to the key. (since the data will per persisted and encountered by 'new' client software)
 ```
-http:dweb/id/23/5/1234 + http:dweb/prop/33 + valueVersionUint + [per the valueVersion] = binary data
+http://dweb/id/23/5/1234 + http://dweb/prop/33 + valueVersionUint + [per the valueVersion] = binary data
 ```
 Adding the valueVersion is a bit of a mess, but would be needed as a hint for program control flow within the client software. If you were to edit an (old) triple you would need to move all data to the 'new version' subtree, and delete the old subtree. This would be a sort of migrate-on-write pattern to allow upgrades. The 'components' of the Value would be determined based on the 'valueVersion'. I don't expect this to upgrade (ever?) but in the event it is needed, this would be a very helpful hook.
 
@@ -443,7 +440,7 @@ In our 'binary' form our key would be made up of several u-var-ints:
 ```
 Subject(5) + Property(3) + valueVersion(1) + valueComponent(2 or 3) = 11-12 u-var-ints
 ```
-We end up with 3 bytes of overhead for our 'dweb' namespace being repeated. I think this is fine. Perhaps someone will want to built their own registrar chain (namespace) for a different usecase. We would want to allow merging of the systems into a single 'distributed web'. Eliding the 'http:' in our trie key is fine yet. We can always associate that with a registrar, as there won't be very many.
+We end up with 3 bytes of overhead for our 'dweb' namespace being repeated. I think this is fine. Perhaps someone will want to built their own registrar chain (namespace) for a different usecase. We would want to allow merging of the systems into a single 'distributed web'. Eliding the 'http://' in our trie key is fine yet. We can always associate that with a registrar, as there won't be very many.
 
 I would imagine there would be networking conventions around asking for chunks or bytes of the binary. I assume all the components of the 'Value' would be serialized and sent together. If the binaryBlob is a hash, I would assume the convention would be to send the hash, proof info for first chunk, and some indication of how many chunks exist for the blob. I would guess that an initial request could also ask for either a chunk offset or byte offset and how many chunks or bytes they want on the first response.
 
